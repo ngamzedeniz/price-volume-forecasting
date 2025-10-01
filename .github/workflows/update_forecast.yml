@@ -2,8 +2,11 @@ name: Update Elexon Forecast
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Her saat başı
-  workflow_dispatch:      # Manuel tetikleme
+    - cron: '0 * * * *'   # Her saat başı
+  workflow_dispatch:       # Manuel tetikleme
+
+permissions:
+  contents: write
 
 jobs:
   update_forecast:
@@ -26,21 +29,25 @@ jobs:
           python <<EOF
           import requests
           import pandas as pd
-          from datetime import datetime
 
-          api_key = '0fad4fex2qqke42'
-          url = f'https://api.bmreports.com/BMRS/B1770/v1?APIKey={api_key}&Period=*&SettlementDate=*&ServiceType=csv'
+          api_key = "0fad4fex2qqke42"
+          url = f"https://api.bmreports.com/BMRS/B1770/v1?APIKey={api_key}&Period=*&SettlementDate=*&ServiceType=csv"
 
-          response = requests.get(url)
+          response = requests.get(url, timeout=60)
           response.raise_for_status()
 
-          with open('elexon_data.csv','wb') as f:
+          with open("elexon_data.csv", "wb") as f:
               f.write(response.content)
 
-          df = pd.read_csv('elexon_data.csv', skiprows=4)
-          df['datetime'] = pd.to_datetime(df['SettlementDate'] + ' ' + df['SettlementPeriod'].astype(str) + ':00', format='%Y-%m-%d %H:%M')
-          df = df[['datetime','Price']]
-          df.to_json('forecast_price.json', orient='records', date_format='iso')
+          df = pd.read_csv("elexon_data.csv", skiprows=4)
+
+          # Datetime hesaplama (SettlementPeriod = 30 dk slotlar)
+          df["datetime"] = pd.to_datetime(df["SettlementDate"]) + pd.to_timedelta((df["SettlementPeriod"]-1)*30, unit="m")
+
+          df = df[["datetime","Price"]]
+          df.to_json("forecast_price.json", orient="records", date_format="iso")
+
+          print("✅ forecast_price.json güncellendi")
           EOF
 
       - name: Commit JSON
