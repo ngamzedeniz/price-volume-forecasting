@@ -1,0 +1,52 @@
+name: Update Elexon Forecast
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Her saat başı
+  workflow_dispatch:      # Manuel tetikleme
+
+jobs:
+  update_forecast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install pandas requests
+
+      - name: Fetch Elexon data
+        run: |
+          python <<EOF
+          import requests
+          import pandas as pd
+          from datetime import datetime
+
+          api_key = '0fad4fex2qqke42'
+          url = f'https://api.bmreports.com/BMRS/B1770/v1?APIKey={api_key}&Period=*&SettlementDate=*&ServiceType=csv'
+
+          response = requests.get(url)
+          response.raise_for_status()
+
+          with open('elexon_data.csv','wb') as f:
+              f.write(response.content)
+
+          df = pd.read_csv('elexon_data.csv', skiprows=4)
+          df['datetime'] = pd.to_datetime(df['SettlementDate'] + ' ' + df['SettlementPeriod'].astype(str) + ':00', format='%Y-%m-%d %H:%M')
+          df = df[['datetime','Price']]
+          df.to_json('forecast_price.json', orient='records', date_format='iso')
+          EOF
+
+      - name: Commit JSON
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'actions@github.com'
+          git add forecast_price.json
+          git commit -m "Update forecast JSON" || echo "No changes"
+          git push
