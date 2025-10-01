@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Scotland Energy Price Forecast</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+  <h1>Scotland Energy Price Forecast</h1>
+  <div id="price_chart"></div>
+  <script>
+    async function loadData() {
+      const priceData = await fetch('forecast_price.json').then(r => r.json());
+      const trace = {
+        x: priceData.map(d => new Date(d.datetime)),
+        y: priceData.map(d => d.Price),
+        mode: 'lines',
+        name: 'Price'
+      };
+      Plotly.newPlot('price_chart', [trace], { title: 'Electricity Price (Scotland)' });
+    }
+    loadData();
+  </script>
+</body>
+</html>
